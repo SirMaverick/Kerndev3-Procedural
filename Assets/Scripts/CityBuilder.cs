@@ -10,6 +10,7 @@ public class CityBuilder : MonoBehaviour {
     public GameObject water;
     public GameObject delete;
     public GameObject empty;
+    public GameObject objective;
 
     private GameObject plane;
     private GameObject parentBuilding;
@@ -17,46 +18,50 @@ public class CityBuilder : MonoBehaviour {
     private GameObject parentWater;
     private GameObject parentDelete;    
     private GameObject parentEnemy;
+    private GameObject parentObjective;
     private GameObject thisPlayer;
-    
-    private List<List<GridObject>> collumns = new List<List<GridObject>>();
-    private List<GridObject> currentList, previousList, nextList;
 
-    private int sizeX;
-    private int sizeZ;
+    public  Node[,] nodeList;
+    private Node currentNode;
+    private Grid grid;
+    public static int givenSize;
+
+    public int sizeX;
+    public int sizeZ;
     private int enemyCounter;
+    private int objectiveCounter;
     private int buildingSize;
     private int checkCounter;
     private float currentX;
     private float currentZ;
     private bool ready;
+    public bool built = false;
 
     // Use this for initialization
     private void Awake() {
-        
+            
+        grid            =       GetComponent<Grid>();
         plane           =       GameObject.Find("Plane");
         parentBuilding  =       GameObject.Find("Buildings");
         parentRoad      =       GameObject.Find("Roads");
         parentWater     =       GameObject.Find("Water");
         parentDelete    =       GameObject.Find("Deleted");
         parentEnemy     =       GameObject.Find("Enemies");
+        parentObjective =       GameObject.Find("Objectives");
         thisPlayer      =       GameObject.Find("Player");
+        plane.transform.localScale = new Vector3(givenSize, 1, givenSize);
         sizeX           =       (int)plane.transform.localScale.x * 10;
         sizeZ           =       (int)plane.transform.localScale.z * 10;
     }
 
     void Start () { //Het maken van de lists en het toevoegen van de GridObjects
         ready = true;
-        for (int l = 0; l < sizeX; l++) {
-            collumns.Add(new List<GridObject>());
-        }
-        foreach (List<GridObject> item in collumns) {
-            for ( int h = 0; h < sizeZ; h++) {
-                item.Add(new GridObject());
-
-            }
-        }   // Dit had in een functie gekunt die 
-            // afgesteld wordt op de grootte van de plane
+        nodeList = grid.grid;
+        
+        
+        
+        // Dit had in een functie gekunt die 
+        // afgesteld wordt op de grootte van de plane
         BuildWater();
         BuildWater();
         BuildWater();
@@ -78,36 +83,32 @@ public class CityBuilder : MonoBehaviour {
     void Create() {
         //Makkelijk toegangkelijke lijsten maken
         for ( int c = 0; c < sizeX; c++) {
-            currentX = c;
-            currentList = collumns[c];
-
             for (int r = 0; r < sizeZ; r++) {
-                GridObject grid = currentList[r];
-                currentZ = r;
+                currentNode = nodeList[c, r];
 
                 int axis = Random.Range(0, 100);
                 if ( axis >= 50) {
-                    grid.hor = true;
+                    currentNode.hor = true;
                 } else {
-                    grid.ver = true;
+                    currentNode.ver = true;
                 }
                 //Check of het object nog geen waarde heeft
                 //Random getal en huis of weg bouwen
-                if ( grid.value == 0) {  
+                if ( currentNode.buildNumber == 0) {  
                     int number = Random.Range(0, 100);
-                    if ( number >= 60) {
-                        if (grid.hor == true) {
+                    if ( number >= 80) {
+                        if (currentNode.hor == true) {
                             BuildStreet(c, r, 1, 1);
-                        } else if (grid.ver == true) {
+                        } else if (currentNode.ver == true) {
                             BuildStreet(c, r, 1, 0);
                         }
-                        grid.value = 1;
+                        currentNode.buildNumber = 1;
 
                     } else {
-                        grid.value = 2;
-                        if (grid.hor == true) {
+                        currentNode.buildNumber = 2;
+                        if (currentNode.hor == true) {
                             BuildRoad(c, r, 1, 0);
-                        } else if ( grid.ver == true) {
+                        } else if ( currentNode.ver == true) {
                             BuildRoad(c, r, 1, 1);
                         }
                     }
@@ -123,26 +124,25 @@ public class CityBuilder : MonoBehaviour {
         int x = value;
         int number = Random.Range(0, 100);
         if (axis == 0) { //build Vertical     
-            if (currentList[r + x].value == 0) {
+            if (r + x < sizeZ - 1&& nodeList[c, r + x].buildNumber == 0) {
                 if (number >= x * x) { 
                     value++;
                     BuildStreet(c, r, value, axis);
-                    currentList[r + x].value = 1;
+                    nodeList[c, r + x].buildNumber = 1;
                 } else {
-                    currentList[r + x].value = 2;
+                    nodeList[c, r + x].buildNumber = 2;
                 }
             } else {
 
             }
         } else if (axis == 1) { //build Horizontal
-            List<GridObject> next = collumns[c + x];
-            if (next[r].value == 0) {
+            if (c + x < sizeX - 1 && nodeList[c + x, r].buildNumber == 0) {
                 if (number >= x * x) {
                     value++;
                     BuildStreet(c, r, value, axis);
-                    next[r].value = 1;
+                    nodeList[c + x , r].buildNumber = 1;
                 } else {
-                    next[r].value = 2;
+                    nodeList[c + x , r].buildNumber = 2;
                 }
 
             } else {
@@ -152,20 +152,11 @@ public class CityBuilder : MonoBehaviour {
     }
 
     void CheckGrid() {
-        // Lijsten toegangkelijk maken
+        // Lijsten toegankelijk maken
         for (int c = 0; c < sizeX; c++) {
-            currentList = collumns[c];
-            if (c != 0) {
-                previousList = collumns[c - 1];
-            }
-            if (c != sizeX - 1) {
-                nextList = collumns[c + 1];
-            }
-
-
             for (int r = 0; r < sizeZ; r++) {
                 buildingSize = 0;
-                if (currentList[r].value == 2) {
+                if (nodeList[c, r].buildNumber == 2) {
                     if (enemyCounter <= 5) { // spawn enemies op een willekeurige weg met een enorm kleine kans
                         
                         float enemyNumber = Random.Range(0, 1.0f);
@@ -175,39 +166,48 @@ public class CityBuilder : MonoBehaviour {
                             enemyCounter++;
                         }
                     }
+
+                    if (objectiveCounter <= 4) {
+                        float objectiveNumber = Random.Range(0, 1.0f);
+
+                        if (objectiveNumber <= 0.0003) {
+                            SpawnObjective(c, r);
+                            objectiveCounter++;
+                        }
+                    }
                     
                     if (r == 0 && c == 0) { // begin van het grid
-                        currentList[r].checkValue += 2;
+                        nodeList[c ,r].checkValue += 2;
                     }
                     // Ergens aan de randen
                     if (r == 0 || c == 0 || r == sizeZ - 1 || c == sizeX - 1) {
-                        currentList[r].checkValue++; 
+                        nodeList[c, r].checkValue++; 
                     }// Onder het object
-                    if (r > 0 && currentList[r - 1].value == 1) {
+                    if (r > 0 && nodeList[c, r - 1].buildNumber == 1) {
                         buildingSize++;
                         // Boven het object
-                    } if (r < sizeZ - 1 && currentList[r + 1].value == 1) {
+                    } if (r < sizeZ - 1 && nodeList[c, r + 1].buildNumber == 1) {
                         buildingSize++;
                         // Links van het object
-                    } if (c > 0 && previousList[r].value == 1) {
+                    } if (c > 0 && nodeList[c - 1, r].buildNumber == 1) {
                         buildingSize++;
                         //Rechts van het object
-                    } if (c < sizeZ && nextList[r].value == 1) {
+                    } if (c < sizeZ -1 && nodeList[c + 1, r].buildNumber== 1) {
                         buildingSize++;
                         //Verander een huis in een weg
                     } if (buildingSize == 4) {
-                        currentList[r].value = 2;
+                        nodeList[c, r].buildNumber = 2;
                         //Geef alles eromheen een waarde verhoging
                     } else if (buildingSize >= 3 && c > 0 && c < sizeX - 1 && r > 0 && r < sizeZ - 1) {
-                        currentList[r - 1].checkValue++;
-                        currentList[r + 1].checkValue++;
-                        previousList[r].checkValue++;
-                        nextList[r].checkValue++;
+                        nodeList[c, r - 1].checkValue++;
+                        nodeList[c, r + 1].checkValue++;
+                        nodeList[c - 1, r].checkValue++;
+                        nodeList[c + 1, r].checkValue++;
                     }
                 }
             }
         }
-        if (checkCounter < 5) {
+        if (checkCounter < 3) {
             checkCounter++;
             CheckGrid();
         }
@@ -220,14 +220,13 @@ public class CityBuilder : MonoBehaviour {
 
     void Replace() {
         for (int c = 0; c < sizeX; c++) {
-            currentList = collumns[c];
             for (int r = 0; r < sizeZ; r++) {
-                if (currentList[r].checkValue >= 4) {
-                    currentList[r].value = 2;
+                if (nodeList[c, r].checkValue >= 4) {
+                    nodeList[c, r].buildNumber = 2;
                 }
             }
         }
-        if ( checkCounter < 5) {
+        if ( checkCounter < 3) {
 
         } else {
             Build();
@@ -236,34 +235,36 @@ public class CityBuilder : MonoBehaviour {
     }
 
     void Build() {
-        for (int c = 0; c < sizeX; c++) {
-            currentList = collumns[c];
-            for (int r = 0; r < sizeZ; r++) {
-                if (currentList[r].value == 1) {
-                    Vector3 buildingPos = building.transform.localScale;
-                    Instantiate(building, new Vector3(buildingPos.x / 2 + c, buildingPos.y / 2, buildingPos.z / 2 + r), Quaternion.identity, parentBuilding.transform);
-                } else if ( currentList[r].value == 2) {
-                    Vector3 roadPos = road.transform.localScale;
-                    Instantiate(road, new Vector3(roadPos.x / 2 + c, roadPos.y / 2, roadPos.z / 2 + r), Quaternion.identity, parentRoad.transform);
-                } else if ( currentList[r].value == 3) {
-                    Vector3 waterPos = water.transform.localScale;
-                    Instantiate(water, new Vector3(waterPos.x / 2 + c, waterPos.y / 2, waterPos.z / 2 + r), Quaternion.identity, parentWater.transform);
-                } else if ( currentList[r].value == 4) {
-                    Vector3 deletePos = delete.transform.localScale;
-                    Instantiate(delete, new Vector3(deletePos.x / 2 + c, deletePos.y / 2, deletePos.z / 2 + r), Quaternion.identity, parentDelete.transform);
+        if (built == false) {
+            for (int c = 0; c < sizeX; c++) {
+                for (int r = 0; r < sizeZ; r++) {
+                    if (nodeList[c, r].buildNumber == 1) {
+                        GameObject go = Instantiate(building, nodeList[c, r].worldPosition, Quaternion.identity, parentBuilding.transform);
+                        go.transform.localScale = new Vector3(go.transform.localScale.x, Random.Range(1.0f, 8.0f), go.transform.localScale.z);
+                        go.transform.position = new Vector3(go.transform.position.x, go.transform.localScale.y / 2, go.transform.position.z);
+                    } else if (nodeList[c, r].buildNumber == 2) {
+                        Instantiate(road, nodeList[c, r].worldPosition + new Vector3(0, road.transform.localScale.y / 2, 0), Quaternion.identity, parentRoad.transform);
+                    } else if (nodeList[c, r].buildNumber == 3) {
+                        Instantiate(water, nodeList[c, r].worldPosition + new Vector3(0, water.transform.localScale.y / 2, 0), Quaternion.identity, parentWater.transform);
+                    } else if (nodeList[c, r].buildNumber == 4) {
+                        Instantiate(delete, nodeList[c,r].worldPosition + new Vector3(0, delete.transform.localScale.y / 2, 0), Quaternion.identity, parentDelete.transform);
+                    }
                 }
             }
+            built = true;
+            grid.CheckTerrain();
         }
+        
     }
 
     void BuildRoad (int c, int r, int value, int axis) {
         int x = value;
         int number = Random.Range(0, 100);
         if (axis == 0) { //build Vertical     
-            if (currentList[r + x].value == 0) {
+            if ((r + x)< sizeZ -1 && nodeList[c, r + x].buildNumber == 0) {
                 if (number >= x * x) {
                     value++;
-                    currentList[r + x].value = 1;
+                    nodeList[c, r + x].buildNumber = 1;
                     BuildRoad(c, r, value, axis);
                     
                 } else {
@@ -273,11 +274,10 @@ public class CityBuilder : MonoBehaviour {
 
             }
         } else if (axis == 1) { //build Horizontal
-            List<GridObject> next = collumns[c + x];
-            if (next[r].value == 0) {
+            if (c + x < sizeX - 1 && nodeList[c + 1, r].buildNumber == 0) {
                 if (number >= x * x) {
                     value++;
-                    next[r].value = 2;
+                    nodeList[c +1, r].buildNumber = 2;
                     BuildRoad(c, r, value, axis);
                     
                 } else {
@@ -296,9 +296,8 @@ public class CityBuilder : MonoBehaviour {
         int posZ = Random.Range(0, sizeZ);
         
         while (posX != sizeX - 1) {
-            List<GridObject> current = collumns[posX];
-            if (current[posZ].value == 0) {
-                current[posZ].value = 3;
+            if (nodeList[posX, posZ].buildNumber == 0) {
+                nodeList[posX, posZ].buildNumber = 3;
             }
             int number = Random.Range(0, 100);
             if ( number >= 80 && posZ != sizeZ - 1) {
@@ -314,63 +313,10 @@ public class CityBuilder : MonoBehaviour {
     }
 
     void SpawnEnemy(int c, int r) {
-        GameObject _enemy = Instantiate(enemy, new Vector3(c + enemy.transform.localScale.x / 2, enemy.transform.localScale.y * 1.5f, enemy.transform.localScale.z / 2 + r), Quaternion.identity, parentEnemy.transform);
+        GameObject _enemy = Instantiate(enemy, nodeList[c, r].worldPosition + new Vector3(0, 2f, 0), Quaternion.identity, parentEnemy.transform);
+    }
+
+    void SpawnObjective(int c, int r) {
+        GameObject _objective = Instantiate(objective, nodeList[c, r].worldPosition + new Vector3(0, 1.0f, 0), Quaternion.identity, parentObjective.transform);
     }
 }
-
-
-
-        /*
-        ready = true;
-        for (int l = 0; l < sizeX; l++) {
-            collumns.Add(new List<int>());
-        }
-        foreach (List<int> item in collumns) {
-            for(int h = 1; h <= sizeZ; h++) {
-                item.Add(0);
-            }
-        }
-        */
-
-/*for (int i = 0; i < sizeX; i++) {
-            currentX = i;
-            currentList = collumns[i];
-
-            if (i > 0) {
-                previousList = collumns[i - 1];
-            }
-
-            for (int f = 0; f < sizeZ; f++) {
-                build = false;
-                currentZ = f;
-                if (f > 0) {
-                    if (i > 0) {
-                        if (previousList[f] == 0 && currentList[f - 1] == 0 ) {
-                            build = true;
-                        }
-                    } else if (i == 0) {
-                        if (currentList[f - 1] == 0) {
-                            build = true;
-                        }
-                    }
-
-                    
-                } else if (f == 0) {
-                    if (i > 0) { 
-                        if (previousList[f] == 0) {
-                            build = true;
-                        }
-                    } else if ( i == 0 ) {
-                        build = true;
-                    }
-                }
-                if ( build ) {
-                    Instantiate(building, new Vector3(currentX + building.transform.localScale.x / 2, building.transform.localScale.y / 2, currentZ + building.transform.localScale.z / 2), Quaternion.identity, parentBuilding.transform);
-                    currentList[f] = 1;
-                    ;
-                   
-                }
-                
-            }
-           
-        }   */
